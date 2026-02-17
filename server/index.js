@@ -21,10 +21,8 @@ app.use('/api/quotes', quoteRoutes);
 
 // Serve frontend in production
 app.use(express.static(join(__dirname, '../client/dist')));
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(join(__dirname, '../client/dist/index.html'));
-  }
+app.get('/{*path}', (req, res) => {
+  res.sendFile(join(__dirname, '../client/dist/index.html'));
 });
 
 app.listen(PORT, () => console.log(`🔨 QuoteCraft server running on port ${PORT}`));
