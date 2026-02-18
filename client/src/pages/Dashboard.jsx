@@ -2,18 +2,35 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import StatusBadge from '../components/StatusBadge';
-import { PlusCircle, FileText, TrendingUp, CheckCircle2, DollarSign, Search } from 'lucide-react';
+import { PlusCircle, FileText, TrendingUp, CheckCircle2, DollarSign, Search, Users, Kanban, Bell, Clock } from 'lucide-react';
 
 export default function Dashboard() {
   const [quotes, setQuotes] = useState([]);
   const [filter, setFilter] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [crmStats, setCrmStats] = useState({ clients: 0, activeJobs: 0, followupsDue: 0, overdueFollowups: [] });
   const navigate = useNavigate();
 
   useEffect(() => {
     api.listQuotes(filter || undefined).then(setQuotes).catch(console.error).finally(() => setLoading(false));
   }, [filter]);
+
+  useEffect(() => {
+    Promise.all([
+      api.listClients().catch(() => []),
+      api.listJobs().catch(() => []),
+      api.listFollowups('active').catch(() => []),
+    ]).then(([clients, jobs, followups]) => {
+      const today = new Date().toISOString().split('T')[0];
+      setCrmStats({
+        clients: clients.length,
+        activeJobs: jobs.filter(j => !['completed', 'paid'].includes(j.stage)).length,
+        followupsDue: followups.filter(f => f.due_date <= today).length,
+        overdueFollowups: followups.filter(f => f.due_date < today).slice(0, 3),
+      });
+    });
+  }, []);
 
   const filtered = quotes.filter(q => !search || 
     q.client_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -40,7 +57,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total Quotes', value: stats.total, icon: FileText, color: 'text-info' },
-          { label: 'Acceptance Rate', value: stats.total ? `${Math.round(stats.accepted / stats.total * 100)}%` : '0%', icon: TrendingUp, color: 'text-success' },
+          { label: 'Conversion Rate', value: stats.total ? `${Math.round(stats.accepted / stats.total * 100)}%` : '0%', icon: TrendingUp, color: 'text-success' },
           { label: 'Total Value', value: `$${stats.totalValue.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`, icon: DollarSign, color: 'text-accent' },
           { label: 'Avg Quote', value: `$${stats.avgValue.toLocaleString('en-AU', { minimumFractionDigits: 2 })}`, icon: CheckCircle2, color: 'text-warning' },
         ].map(({ label, value, icon: Icon, color }) => (
@@ -53,6 +70,33 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* CRM Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div onClick={() => navigate('/clients')} className="bg-card border border-border rounded-2xl p-4 cursor-pointer hover:border-accent/30 transition-all">
+          <div className="flex items-center justify-between mb-2"><span className="text-xs text-text-dim">Total Clients</span><Users className="w-4 h-4 text-cyan-400" /></div>
+          <div className="text-xl font-bold">{crmStats.clients}</div>
+        </div>
+        <div onClick={() => navigate('/pipeline')} className="bg-card border border-border rounded-2xl p-4 cursor-pointer hover:border-accent/30 transition-all">
+          <div className="flex items-center justify-between mb-2"><span className="text-xs text-text-dim">Active Jobs</span><Kanban className="w-4 h-4 text-blue-400" /></div>
+          <div className="text-xl font-bold">{crmStats.activeJobs}</div>
+        </div>
+        <div onClick={() => navigate('/followups')} className="bg-card border border-border rounded-2xl p-4 cursor-pointer hover:border-accent/30 transition-all">
+          <div className="flex items-center justify-between mb-2"><span className="text-xs text-text-dim">Follow-ups Due</span><Bell className={`w-4 h-4 ${crmStats.followupsDue > 0 ? 'text-red-400' : 'text-text-dim'}`} /></div>
+          <div className={`text-xl font-bold ${crmStats.followupsDue > 0 ? 'text-red-400' : ''}`}>{crmStats.followupsDue}</div>
+        </div>
+      </div>
+
+      {/* Overdue follow-ups alert */}
+      {crmStats.overdueFollowups.length > 0 && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-2"><Clock className="w-4 h-4 text-red-400" /><span className="text-sm font-medium text-red-400">Overdue Follow-ups</span></div>
+          {crmStats.overdueFollowups.map(f => (
+            <div key={f.id} className="text-sm text-text-dim">{f.title} {f.client_name && `— ${f.client_name}`}</div>
+          ))}
+          <button onClick={() => navigate('/followups')} className="text-xs text-accent mt-2">View all →</button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">

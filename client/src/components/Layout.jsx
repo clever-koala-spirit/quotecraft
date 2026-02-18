@@ -1,10 +1,13 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
-import { LayoutDashboard, PlusCircle, Settings, LogOut, Hammer } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Settings, LogOut, Hammer, Users, Kanban, Bell, FileText } from 'lucide-react';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/quotes/new', icon: PlusCircle, label: 'New Quote' },
+  { to: '/clients', icon: Users, label: 'Clients' },
+  { to: '/pipeline', icon: Kanban, label: 'Pipeline' },
+  { to: '/followups', icon: Bell, label: 'Follow-ups' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 

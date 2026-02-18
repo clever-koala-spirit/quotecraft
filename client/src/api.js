@@ -36,4 +36,27 @@ export const api = {
   chat: (d) => request('/chat', { method: 'POST', body: JSON.stringify(d) }),
   chatHistory: (convId) => request(`/chat/${convId}`),
   chatConversations: () => request('/chat/conversations'),
+
+  // CRM - Clients
+  listClients: (search, tag) => request(`/clients${search || tag ? `?${new URLSearchParams({ ...(search && { search }), ...(tag && { tag }) })}` : ''}`),
+  getClient: (id) => request(`/clients/${id}`),
+  createClient: (d) => request('/clients', { method: 'POST', body: JSON.stringify(d) }),
+  updateClient: (id, d) => request(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  deleteClient: (id) => request(`/clients/${id}`, { method: 'DELETE' }),
+  addClientNote: (id, d) => request(`/clients/${id}/notes`, { method: 'POST', body: JSON.stringify(d) }),
+  getClientTimeline: (id) => request(`/clients/${id}/timeline`),
+  importClients: (clients) => request('/clients/import', { method: 'POST', body: JSON.stringify({ clients }) }),
+
+  // CRM - Jobs
+  listJobs: (stage) => request(`/jobs${stage ? `?stage=${stage}` : ''}`),
+  getJob: (id) => request(`/jobs/${id}`),
+  createJob: (d) => request('/jobs', { method: 'POST', body: JSON.stringify(d) }),
+  updateJob: (id, d) => request(`/jobs/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  deleteJob: (id) => request(`/jobs/${id}`, { method: 'DELETE' }),
+
+  // CRM - Follow-ups
+  listFollowups: (filter) => request(`/followups${filter ? `?filter=${filter}` : ''}`),
+  createFollowup: (d) => request('/followups', { method: 'POST', body: JSON.stringify(d) }),
+  updateFollowup: (id, d) => request(`/followups/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  deleteFollowup: (id) => request(`/followups/${id}`, { method: 'DELETE' }),
 };

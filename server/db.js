@@ -103,6 +103,70 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_chat_conv ON chat_messages(conversation_id, user_id);
 `);
 
+// CRM tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS clients (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    address TEXT,
+    company TEXT,
+    tags TEXT,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS client_timeline (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    content TEXT,
+    metadata TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS jobs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    client_id TEXT,
+    quote_id TEXT,
+    title TEXT NOT NULL,
+    description TEXT,
+    stage TEXT DEFAULT 'lead',
+    value REAL,
+    scheduled_date TEXT,
+    completed_date TEXT,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS followups (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    client_id TEXT,
+    quote_id TEXT,
+    job_id TEXT,
+    title TEXT NOT NULL,
+    due_date TEXT NOT NULL,
+    completed INTEGER DEFAULT 0,
+    completed_at DATETIME,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_clients_user ON clients(user_id);
+  CREATE INDEX IF NOT EXISTS idx_timeline_client ON client_timeline(client_id);
+  CREATE INDEX IF NOT EXISTS idx_jobs_user ON jobs(user_id);
+  CREATE INDEX IF NOT EXISTS idx_jobs_client ON jobs(client_id);
+  CREATE INDEX IF NOT EXISTS idx_followups_user ON followups(user_id);
+  CREATE INDEX IF NOT EXISTS idx_followups_due ON followups(due_date);
+`);
+
 // Migrations for existing databases
 try { db.exec(`ALTER TABLE quotes ADD COLUMN template TEXT DEFAULT 'clean-modern'`); } catch(e) { /* column exists */ }
 try { db.exec(`CREATE TABLE IF NOT EXISTS quote_attachments (id TEXT PRIMARY KEY, quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE, filename TEXT NOT NULL, original_name TEXT, mime_type TEXT, size INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))`); } catch(e) { /* exists */ }

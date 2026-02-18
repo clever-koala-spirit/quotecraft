@@ -10,6 +10,10 @@ import QuoteDetail from './pages/QuoteDetail';
 import Settings from './pages/Settings';
 import PublicQuote from './pages/PublicQuote';
 import Pricing from './pages/Pricing';
+import ClientsPage from './pages/ClientsPage';
+import ClientDetailPage from './pages/ClientDetailPage';
+import PipelinePage from './pages/PipelinePage';
+import FollowupsPage from './pages/FollowupsPage';
 import Layout from './components/Layout';
 import ChatWidget from './components/ChatWidget';
 
@@ -62,6 +66,10 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/quotes/new" element={<NewQuote />} />
             <Route path="/quotes/:id" element={<QuoteDetail />} />
+            <Route path="/clients" element={<ClientsPage />} />
+            <Route path="/clients/:id" element={<ClientDetailPage />} />
+            <Route path="/pipeline" element={<PipelinePage />} />
+            <Route path="/followups" element={<FollowupsPage />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>

@@ -239,13 +239,40 @@ router.delete('/:id', authenticateToken, (req, res) => {
   res.json({ success: true });
 });
 
-// Send quote
+// Send quote — auto-create client + timeline
 router.post('/:id/send', authenticateToken, (req, res) => {
   const quote = db.prepare('SELECT * FROM quotes WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
   if (!quote) return res.status(404).json({ error: 'Not found' });
 
   db.prepare("UPDATE quotes SET status = 'sent', sent_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(quote.id);
   addEvent(quote.id, 'sent', { to: quote.client_email });
+
+  // Auto-create client if not exists
+  let client = null;
+  if (quote.client_email) {
+    client = db.prepare('SELECT * FROM clients WHERE email = ? AND user_id = ?').get(quote.client_email, req.user.id);
+  }
+  if (!client && quote.client_name) {
+    // Try match by name if no email
+    if (!quote.client_email) {
+      client = db.prepare('SELECT * FROM clients WHERE name = ? AND user_id = ?').get(quote.client_name, req.user.id);
+    }
+    if (!client) {
+      const clientId = uuid();
+      db.prepare(`INSERT INTO clients (id, user_id, name, email, phone, address, tags) VALUES (?, ?, ?, ?, ?, ?, '[]')`).run(
+        clientId, req.user.id, quote.client_name, quote.client_email || null, quote.client_phone || null, quote.client_address || null
+      );
+      client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId);
+    }
+  }
+
+  // Log to client timeline
+  if (client) {
+    const tlId = uuid();
+    db.prepare('INSERT INTO client_timeline (id, client_id, user_id, type, content, metadata) VALUES (?, ?, ?, ?, ?, ?)').run(
+      tlId, client.id, req.user.id, 'quote_sent', `Quote sent: $${quote.total}`, JSON.stringify({ quote_id: quote.id, total: quote.total })
+    );
+  }
 
   console.log(`📧 Quote ${quote.id} sent to ${quote.client_email}`);
   res.json({ success: true, publicUrl: `/q/${quote.id}` });
@@ -262,6 +289,15 @@ router.get('/:id/view', (req, res) => {
       db.prepare("UPDATE quotes SET status = 'viewed' WHERE id = ?").run(quote.id);
     }
     addEvent(quote.id, 'viewed');
+    // Timeline entry
+    if (quote.client_email) {
+      const client = db.prepare('SELECT id FROM clients WHERE email = ?').get(quote.client_email);
+      if (client) {
+        db.prepare('INSERT INTO client_timeline (id, client_id, user_id, type, content, metadata) VALUES (?, ?, ?, ?, ?, ?)').run(
+          uuid(), client.id, quote.user_id, 'quote_viewed', 'Quote viewed by client', JSON.stringify({ quote_id: quote.id })
+        );
+      }
+    }
   }
   res.json(quote);
 });
@@ -272,12 +308,29 @@ router.post('/:id/accept', (req, res) => {
   if (!quote) return res.status(404).json({ error: 'Not found' });
 
   const action = req.body.action || 'accept';
+  const eventType = action === 'decline' ? 'declined' : 'accepted';
+
   if (action === 'decline') {
     db.prepare("UPDATE quotes SET status = 'declined', declined_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(quote.id);
-    addEvent(quote.id, 'declined');
   } else {
     db.prepare("UPDATE quotes SET status = 'accepted', accepted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(quote.id);
-    addEvent(quote.id, 'accepted');
+  }
+  addEvent(quote.id, eventType);
+
+  // Timeline entry
+  if (quote.client_email) {
+    const client = db.prepare('SELECT id FROM clients WHERE email = ?').get(quote.client_email);
+    if (client) {
+      db.prepare('INSERT INTO client_timeline (id, client_id, user_id, type, content, metadata) VALUES (?, ?, ?, ?, ?, ?)').run(
+        uuid(), client.id, quote.user_id, `quote_${eventType}`, `Quote ${eventType}: $${quote.total}`, JSON.stringify({ quote_id: quote.id })
+      );
+      // Auto-create job on accept
+      if (eventType === 'accepted') {
+        db.prepare(`INSERT INTO jobs (id, user_id, client_id, quote_id, title, description, stage, value) VALUES (?, ?, ?, ?, ?, ?, 'accepted', ?)`).run(
+          uuid(), quote.user_id, client.id, quote.id, quote.job_description || 'Job from quote', quote.job_description, quote.total
+        );
+      }
+    }
   }
   res.json({ success: true });
 });
