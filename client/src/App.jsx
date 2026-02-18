@@ -11,6 +11,7 @@ import Settings from './pages/Settings';
 import PublicQuote from './pages/PublicQuote';
 import Pricing from './pages/Pricing';
 import Layout from './components/Layout';
+import ChatWidget from './components/ChatWidget';
 
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -64,6 +65,7 @@ export default function App() {
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>
+        {user && <ChatWidget />}
       </BrowserRouter>
     </AuthContext.Provider>
   );

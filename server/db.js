@@ -91,6 +91,18 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    role TEXT NOT NULL,
+    content TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_conv ON chat_messages(conversation_id, user_id);
+`);
+
 // Migrations for existing databases
 try { db.exec(`ALTER TABLE quotes ADD COLUMN template TEXT DEFAULT 'clean-modern'`); } catch(e) { /* column exists */ }
 try { db.exec(`CREATE TABLE IF NOT EXISTS quote_attachments (id TEXT PRIMARY KEY, quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE, filename TEXT NOT NULL, original_name TEXT, mime_type TEXT, size INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))`); } catch(e) { /* exists */ }

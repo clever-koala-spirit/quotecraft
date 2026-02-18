@@ -33,4 +33,7 @@ export const api = {
   viewQuote: (id) => request(`/quotes/${id}/view`),
   acceptQuote: (id, action) => request(`/quotes/${id}/accept`, { method: 'POST', body: JSON.stringify({ action }) }),
   downloadPdf: (id, template) => request(`/quotes/${id}/pdf${template ? `?template=${template}` : ''}`),
+  chat: (d) => request('/chat', { method: 'POST', body: JSON.stringify(d) }),
+  chatHistory: (convId) => request(`/chat/${convId}`),
+  chatConversations: () => request('/chat/conversations'),
 };

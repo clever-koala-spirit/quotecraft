@@ -6,6 +6,7 @@ import { dirname, join } from 'path';
 import authRoutes from './routes/auth.js';
 import profileRoutes from './routes/profile.js';
 import quoteRoutes from './routes/quotes.js';
+import chatRoutes from './routes/chat.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -18,6 +19,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/quotes', quoteRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Serve uploads
 app.use('/api/uploads', express.static(join(__dirname, 'uploads')));

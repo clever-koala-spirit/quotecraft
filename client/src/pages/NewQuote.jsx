@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import LineItemTable from '../components/LineItemTable';
 import TemplatePicker from '../components/TemplatePicker';
@@ -19,6 +19,30 @@ export default function NewQuote() {
   const [showTemplates, setShowTemplates] = useState(false);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const chatQuote = searchParams.get('chatQuote');
+    if (chatQuote) {
+      try {
+        const data = JSON.parse(chatQuote);
+        if (data.title) setTitle(data.title);
+        if (data.description) setDescription(data.description);
+        if (data.notes) setNotes(data.notes);
+        if (data.lineItems?.length) {
+          setItems(data.lineItems.map(i => ({
+            description: i.description,
+            quantity: i.quantity || 1,
+            unit: i.unit || 'each',
+            unitPrice: i.unitPrice || 0,
+            total: (i.quantity || 1) * (i.unitPrice || 0),
+            category: i.category || 'labour',
+          })));
+          setGenerated({ title: data.title, description: data.description, items: data.lineItems, notes: data.notes });
+        }
+      } catch {}
+    }
+  }, []);
 
   const addFiles = useCallback((newFiles) => {
     const fileArray = Array.from(newFiles).slice(0, 10 - files.length);
