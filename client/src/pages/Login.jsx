@@ -45,6 +45,18 @@ export default function Login() {
               {loading ? 'Logging in...' : 'Log in'}
             </button>
           </form>
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
+            <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-text-dim">or</span></div>
+          </div>
+          <button
+            type="button"
+            onClick={async () => { setLoading(true); try { await login({ email: 'demo@quotecraft.com', password: 'demo1234' }); navigate('/dashboard'); } catch(err) { setError('Demo account not found. Run seed first.'); } finally { setLoading(false); } }}
+            disabled={loading}
+            className="w-full border border-accent text-accent hover:bg-accent/10 disabled:opacity-50 py-3 rounded-xl font-medium transition-colors"
+          >
+            Try Demo Account
+          </button>
           <p className="text-sm text-text-dim text-center mt-4">
             Don't have an account? <Link to="/signup" className="text-accent hover:text-accent-hover">Sign up</Link>
           </p>

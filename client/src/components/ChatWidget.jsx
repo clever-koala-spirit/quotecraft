@@ -264,19 +264,19 @@ export default function ChatWidget() {
                 type="button"
                 onClick={startRecording}
                 disabled={loading || transcribing}
-                className={`p-2.5 rounded-xl transition-all ${
+                className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition-all ${
                   recording
-                    ? 'bg-red-500 text-white animate-pulse'
+                    ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
                     : transcribing
                       ? 'bg-[#1a1b23] text-accent'
-                      : 'bg-[#1a1b23] text-text-dim hover:text-accent'
+                      : 'bg-[#1a1b23] text-text-dim hover:text-accent hover:bg-[#22232e]'
                 } disabled:opacity-30`}
                 title={recording ? 'Stop recording' : 'Voice input'}
               >
-                {transcribing ? <Loader2 size={16} className="animate-spin" /> : <Mic size={16} />}
+                {transcribing ? <Loader2 size={20} className="animate-spin" /> : <Mic size={20} />}
               </button>
-              <button type="submit" disabled={loading || !input.trim()} className="bg-accent hover:bg-accent/80 disabled:opacity-30 text-white p-2.5 rounded-xl transition-colors">
-                <Send size={16} />
+              <button type="submit" disabled={loading || !input.trim()} className="min-w-[44px] min-h-[44px] flex items-center justify-center bg-accent hover:bg-accent/80 disabled:opacity-30 text-white rounded-xl transition-colors">
+                <Send size={20} />
               </button>
             </div>
           </form>
