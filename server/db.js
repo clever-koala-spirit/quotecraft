@@ -56,6 +56,7 @@ db.exec(`
     accepted_at TEXT,
     declined_at TEXT,
     created_at TEXT DEFAULT (datetime('now')),
+    template TEXT DEFAULT 'clean-modern',
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
@@ -71,6 +72,16 @@ db.exec(`
     sort_order INTEGER DEFAULT 0
   );
 
+  CREATE TABLE IF NOT EXISTS quote_attachments (
+    id TEXT PRIMARY KEY,
+    quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    original_name TEXT,
+    mime_type TEXT,
+    size INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS quote_events (
     id TEXT PRIMARY KEY,
     quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
@@ -79,5 +90,9 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 `);
+
+// Migrations for existing databases
+try { db.exec(`ALTER TABLE quotes ADD COLUMN template TEXT DEFAULT 'clean-modern'`); } catch(e) { /* column exists */ }
+try { db.exec(`CREATE TABLE IF NOT EXISTS quote_attachments (id TEXT PRIMARY KEY, quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE, filename TEXT NOT NULL, original_name TEXT, mime_type TEXT, size INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))`); } catch(e) { /* exists */ }
 
 export default db;

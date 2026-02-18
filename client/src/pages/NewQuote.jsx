@@ -1,29 +1,57 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import TradeTypePicker from '../components/TradeTypePicker';
 import LineItemTable from '../components/LineItemTable';
-import { ArrowLeft, ArrowRight, Loader2, Sparkles, Send, Download, Upload, X } from 'lucide-react';
-
-const steps = ['Trade Type', 'Job Details', 'Line Items', 'Client Details', 'Preview & Send'];
+import TemplatePicker from '../components/TemplatePicker';
+import { ArrowLeft, Loader2, Sparkles, Send, Download, Upload, X, FileText, Image, File } from 'lucide-react';
 
 export default function NewQuote() {
-  const [step, setStep] = useState(0);
-  const [tradeType, setTradeType] = useState('');
-  const [jobDescription, setJobDescription] = useState('');
-  const [photos, setPhotos] = useState([]);
-  const [items, setItems] = useState([]);
-  const [client, setClient] = useState({ name: '', email: '', phone: '', address: '' });
+  const [files, setFiles] = useState([]);
+  const [description, setDescription] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [generated, setGenerated] = useState(null); // { title, description, items, notes, uploadedFiles }
+  const [items, setItems] = useState([]);
+  const [title, setTitle] = useState('');
+  const [notes, setNotes] = useState('');
+  const [client, setClient] = useState({ name: '', email: '', phone: '', address: '' });
+  const [template, setTemplate] = useState('clean-modern');
   const [saving, setSaving] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
+  const addFiles = useCallback((newFiles) => {
+    const fileArray = Array.from(newFiles).slice(0, 10 - files.length);
+    const withPreviews = fileArray.map(f => ({
+      file: f,
+      name: f.name,
+      type: f.type,
+      size: f.size,
+      preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : null
+    }));
+    setFiles(prev => [...prev, ...withPreviews].slice(0, 10));
+  }, [files.length]);
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files);
+  };
+
   const handleGenerate = async () => {
+    if (!description && files.length === 0) return;
     setGenerating(true);
     try {
-      const res = await api.generateQuote({ tradeType, jobDescription, photos, clientName: client.name });
+      const formData = new FormData();
+      formData.append('description', description);
+      files.forEach(f => formData.append('files', f.file));
+
+      const res = await api.generateQuote(formData);
+      setGenerated(res);
+      setTitle(res.title || '');
       setItems(res.items.map(i => ({ ...i, total: i.total || i.quantity * i.unitPrice })));
-      setStep(2);
+      setNotes(res.notes || '');
+      if (res.description && !description) setDescription(res.description);
     } catch (err) {
       alert('Generation failed: ' + err.message);
     } finally {
@@ -35,13 +63,16 @@ export default function NewQuote() {
     setSaving(true);
     try {
       const quote = await api.createQuote({
-        trade_type: tradeType,
-        job_description: jobDescription,
+        trade_type: 'general',
+        job_description: `${title}\n\n${description}`,
         client_name: client.name,
         client_email: client.email,
         client_phone: client.phone,
         client_address: client.address,
         items: items.map(i => ({ ...i, unitPrice: i.unitPrice })),
+        notes,
+        template,
+        tempFiles: generated?.uploadedFiles || [],
       });
       if (send && quote.id) await api.sendQuote(quote.id);
       navigate(`/quotes/${quote.id}`);
@@ -52,26 +83,16 @@ export default function NewQuote() {
     }
   };
 
-  const handlePhotoDrop = (e) => {
-    e.preventDefault();
-    const files = Array.from(e.dataTransfer?.files || e.target.files || []);
-    files.forEach(f => {
-      const reader = new FileReader();
-      reader.onload = () => setPhotos(prev => [...prev, { name: f.name, data: reader.result }]);
-      reader.readAsDataURL(f);
-    });
+  const fileIcon = (type) => {
+    if (type?.startsWith('image/')) return <Image className="w-5 h-5 text-blue-400" />;
+    if (type === 'application/pdf') return <FileText className="w-5 h-5 text-red-400" />;
+    return <File className="w-5 h-5 text-text-dim" />;
   };
 
-  const subtotal = items.reduce((s, i) => s + (Number(i.total) || 0), 0);
-  const gst = Math.round(subtotal * 0.1 * 100) / 100;
-  const total = Math.round((subtotal + gst) * 100) / 100;
-
-  const canNext = () => {
-    if (step === 0) return !!tradeType;
-    if (step === 1) return !!jobDescription;
-    if (step === 2) return items.length > 0;
-    if (step === 3) return !!client.name;
-    return true;
+  const formatSize = (bytes) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   return (
@@ -80,142 +101,156 @@ export default function NewQuote() {
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        {steps.map((s, i) => (
-          <div key={s} className={`flex items-center gap-2 shrink-0 ${i <= step ? 'text-accent' : 'text-text-dim'}`}>
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-              i < step ? 'bg-accent text-white' : i === step ? 'border-2 border-accent' : 'border border-border'
-            }`}>{i + 1}</div>
-            <span className="text-xs hidden sm:inline">{s}</span>
-            {i < steps.length - 1 && <div className={`w-8 h-px ${i < step ? 'bg-accent' : 'bg-border'}`} />}
-          </div>
-        ))}
+      <h1 className="text-2xl font-bold">New Quote</h1>
+
+      {/* Upload Zone */}
+      <div
+        onDrop={handleDrop}
+        onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+        onClick={() => fileInputRef.current?.click()}
+        className="border-2 border-dashed border-border rounded-2xl p-8 md:p-12 text-center cursor-pointer hover:border-accent/60 transition-all group"
+      >
+        <Upload className="w-10 h-10 text-text-dim mx-auto mb-3 group-hover:text-accent transition-colors" />
+        <p className="text-lg font-medium mb-1">Drop photos, documents, emails — anything about the job</p>
+        <p className="text-sm text-text-dim">JPG, PNG, PDF, HEIC, or any document • Max 10 files, 10MB each</p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,.pdf,.doc,.docx,.txt,.eml,.msg,.heic"
+          className="hidden"
+          onChange={e => addFiles(e.target.files)}
+        />
       </div>
 
-      {/* Step 0: Trade Type */}
-      {step === 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold">What type of trade?</h2>
-          <TradeTypePicker value={tradeType} onChange={setTradeType} />
-        </div>
-      )}
-
-      {/* Step 1: Job Details */}
-      {step === 1 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold">Describe the job</h2>
-          <textarea value={jobDescription} onChange={e => setJobDescription(e.target.value)}
-            placeholder="e.g. Install 6 new GPOs in a kitchen renovation, run new circuit from switchboard, LED downlights x8..."
-            className="min-h-[150px] resize-y" />
-          
-          <div>
-            <h3 className="text-sm font-medium mb-2">Photos (optional)</h3>
-            <div onDrop={handlePhotoDrop} onDragOver={e => e.preventDefault()}
-              className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-accent/50 transition-colors"
-              onClick={() => document.getElementById('photo-input').click()}>
-              <Upload className="w-8 h-8 text-text-dim mx-auto mb-2" />
-              <p className="text-sm text-text-dim">Drag & drop photos or click to browse</p>
-              <input id="photo-input" type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoDrop} />
-            </div>
-            {photos.length > 0 && (
-              <div className="flex gap-2 mt-3 flex-wrap">
-                {photos.map((p, i) => (
-                  <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden">
-                    <img src={p.data} alt="" className="w-full h-full object-cover" />
-                    <button onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))}
-                      className="absolute top-1 right-1 w-5 h-5 bg-black/60 rounded-full flex items-center justify-center">
-                      <X className="w-3 h-3" />
-                    </button>
+      {/* File Previews */}
+      {files.length > 0 && (
+        <div className="flex gap-3 flex-wrap">
+          {files.map((f, i) => (
+            <div key={i} className="relative bg-card border border-border rounded-xl overflow-hidden group" style={{ width: f.preview ? 100 : 'auto' }}>
+              {f.preview ? (
+                <img src={f.preview} alt="" className="w-[100px] h-[100px] object-cover" />
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2">
+                  {fileIcon(f.type)}
+                  <div className="text-xs">
+                    <div className="truncate max-w-[120px]">{f.name}</div>
+                    <div className="text-text-dim">{formatSize(f.size)}</div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Step 2: Line Items */}
-      {step === 2 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">Line Items</h2>
-            <span className="text-xs text-text-dim">Edit items as needed • All prices ex-GST</span>
-          </div>
-          <LineItemTable items={items} onChange={setItems} />
-        </div>
-      )}
-
-      {/* Step 3: Client Details */}
-      {step === 3 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold">Client Details</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div><label className="text-sm text-text-dim block mb-1">Name *</label>
-              <input value={client.name} onChange={e => setClient({ ...client, name: e.target.value })} /></div>
-            <div><label className="text-sm text-text-dim block mb-1">Email</label>
-              <input type="email" value={client.email} onChange={e => setClient({ ...client, email: e.target.value })} /></div>
-            <div><label className="text-sm text-text-dim block mb-1">Phone</label>
-              <input value={client.phone} onChange={e => setClient({ ...client, phone: e.target.value })} /></div>
-            <div><label className="text-sm text-text-dim block mb-1">Address</label>
-              <input value={client.address} onChange={e => setClient({ ...client, address: e.target.value })} /></div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 4: Preview */}
-      {step === 4 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold">Preview & Send</h2>
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-            <div className="flex justify-between">
-              <div>
-                <div className="font-bold text-lg">{client.name}</div>
-                <div className="text-sm text-text-dim">{client.email} {client.phone && `• ${client.phone}`}</div>
-                {client.address && <div className="text-sm text-text-dim">{client.address}</div>}
-              </div>
-              <div className="text-right">
-                <div className="text-sm text-text-dim capitalize">{tradeType}</div>
-              </div>
+                </div>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); setFiles(prev => prev.filter((_, idx) => idx !== i)); }}
+                className="absolute top-1 right-1 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-3 h-3 text-white" />
+              </button>
             </div>
-            {jobDescription && <p className="text-sm text-text-dim border-t border-border pt-3">{jobDescription}</p>}
-            <LineItemTable items={items} onChange={() => {}} readOnly />
-          </div>
+          ))}
         </div>
       )}
 
-      {/* Navigation */}
-      <div className="flex justify-between pt-4 border-t border-border">
-        <button onClick={() => setStep(s => s - 1)} disabled={step === 0}
-          className="px-4 py-2 rounded-xl text-sm border border-border disabled:opacity-30 hover:border-accent/50 transition-colors flex items-center gap-2">
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
-        <div className="flex gap-2">
-          {step === 1 && (
-            <button onClick={handleGenerate} disabled={!canNext() || generating}
-              className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
-              {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate Quote</>}
-            </button>
-          )}
-          {step === 4 ? (
-            <>
-              <button onClick={() => handleSave(false)} disabled={saving}
-                className="px-4 py-2 rounded-xl text-sm border border-border hover:border-accent/50 transition-colors flex items-center gap-2">
-                <Download className="w-4 h-4" /> Save Draft
-              </button>
-              <button onClick={() => handleSave(true)} disabled={saving || !client.email}
-                className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Send Quote
-              </button>
-            </>
-          ) : step !== 1 && (
-            <button onClick={() => setStep(s => s + 1)} disabled={!canNext()}
-              className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
-              Next <ArrowRight className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+      {/* Description */}
+      <div>
+        <label className="text-sm font-medium text-text-dim block mb-2">Describe the job in your own words</label>
+        <textarea
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          placeholder="Rewire kitchen, 6 power points, new LED downlights, existing house built 1990... Paste anything here — emails, notes, job details."
+          className="min-h-[120px] resize-y text-base"
+        />
       </div>
+
+      {/* Generate Button */}
+      {!generated && (
+        <button
+          onClick={handleGenerate}
+          disabled={generating || (!description && files.length === 0)}
+          className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 text-white py-4 rounded-2xl text-lg font-bold transition-colors flex items-center justify-center gap-3"
+        >
+          {generating ? (
+            <>
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <span>AI is analyzing your files...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-6 h-6" />
+              <span>Generate Quote</span>
+            </>
+          )}
+        </button>
+      )}
+
+      {/* Generated Quote Preview */}
+      {generated && (
+        <div className="space-y-6 border-t border-border pt-6">
+          {/* Title */}
+          <div>
+            <label className="text-sm font-medium text-text-dim block mb-1">Job Title</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} className="text-lg font-bold" />
+          </div>
+
+          {/* Line Items */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-bold">Line Items</h3>
+              <span className="text-xs text-text-dim">Edit items as needed • All prices ex-GST</span>
+            </div>
+            <LineItemTable items={items} onChange={setItems} />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="text-sm font-medium text-text-dim block mb-1">Notes & Assumptions</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[80px] resize-y text-sm" />
+          </div>
+
+          {/* Client Details */}
+          <div>
+            <h3 className="font-bold mb-3">Client Details</h3>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div><label className="text-sm text-text-dim block mb-1">Name *</label>
+                <input value={client.name} onChange={e => setClient({ ...client, name: e.target.value })} /></div>
+              <div><label className="text-sm text-text-dim block mb-1">Email</label>
+                <input type="email" value={client.email} onChange={e => setClient({ ...client, email: e.target.value })} /></div>
+              <div><label className="text-sm text-text-dim block mb-1">Phone</label>
+                <input value={client.phone} onChange={e => setClient({ ...client, phone: e.target.value })} /></div>
+              <div><label className="text-sm text-text-dim block mb-1">Address</label>
+                <input value={client.address} onChange={e => setClient({ ...client, address: e.target.value })} /></div>
+            </div>
+          </div>
+
+          {/* Template Picker */}
+          <div>
+            <button onClick={() => setShowTemplates(!showTemplates)} className="text-sm text-accent hover:text-accent-hover font-medium">
+              {showTemplates ? 'Hide templates' : 'Choose PDF template →'}
+            </button>
+            {showTemplates && <TemplatePicker value={template} onChange={setTemplate} />}
+          </div>
+
+          {/* Regenerate */}
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="text-sm text-text-dim hover:text-accent transition-colors flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4" /> Regenerate with AI
+          </button>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-3 pt-4 border-t border-border">
+            <button onClick={() => handleSave(false)} disabled={saving || !client.name}
+              className="px-5 py-3 rounded-xl text-sm border border-border hover:border-accent/50 transition-colors flex items-center gap-2 font-medium">
+              <Download className="w-4 h-4" /> Save Draft
+            </button>
+            <button onClick={() => handleSave(true)} disabled={saving || !client.name || !client.email}
+              className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-white px-5 py-3 rounded-xl text-sm font-bold transition-colors flex items-center gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Send Quote
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

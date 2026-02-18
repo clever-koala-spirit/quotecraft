@@ -50,7 +50,7 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={{ user, login, signup, logout }}>
-      <BrowserRouter>
+      <BrowserRouter basename="/quotecraft">
         <Routes>
           <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Landing />} />
           <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />

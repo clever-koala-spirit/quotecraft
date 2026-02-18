@@ -19,6 +19,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/quotes', quoteRoutes);
 
+// Serve uploads
+app.use('/api/uploads', express.static(join(__dirname, 'uploads')));
+
 // Serve frontend in production
 app.use(express.static(join(__dirname, '../client/dist')));
 app.get('/{*path}', (req, res) => {
