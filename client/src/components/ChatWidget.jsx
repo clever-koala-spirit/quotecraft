@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { MessageCircle, X, Send, ImagePlus, Loader2, FileText } from 'lucide-react';
+import { MessageCircle, X, Send, ImagePlus, Loader2, FileText, Mic } from 'lucide-react';
 
 function extractQuoteData(text) {
   const match = text.match(/```json\s*([\s\S]*?)```/);
@@ -43,9 +43,89 @@ export default function ChatWidget() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [convId, setConvId] = useState(null);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const scrollRef = useRef(null);
   const fileRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
   const navigate = useNavigate();
+
+  // Speech recognition setup
+  const hasSpeechAPI = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  const stopRecording = useCallback(() => {
+    setRecording(false);
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    if (recording) { stopRecording(); return; }
+    setRecording(true);
+
+    if (hasSpeechAPI) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SR();
+      recognition.lang = 'en-AU';
+      recognition.interimResults = true;
+      recognition.continuous = true;
+      let silenceTimer = null;
+      let finalTranscript = '';
+
+      recognition.onresult = (e) => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            finalTranscript += e.results[i][0].transcript;
+          } else {
+            interim += e.results[i][0].transcript;
+          }
+        }
+        setInput(finalTranscript + interim);
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => { recognition.stop(); }, 2000);
+      };
+      recognition.onend = () => { setRecording(false); recognitionRef.current = null; };
+      recognition.onerror = () => { setRecording(false); recognitionRef.current = null; };
+      recognitionRef.current = recognition;
+      recognition.start();
+    } else {
+      // Fallback: MediaRecorder + Whisper
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mr = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4' });
+        const chunks = [];
+        mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+        mr.onstop = async () => {
+          stream.getTracks().forEach(t => t.stop());
+          setRecording(false);
+          setTranscribing(true);
+          try {
+            const blob = new Blob(chunks, { type: mr.mimeType });
+            const result = await api.transcribe(blob);
+            if (result.text) setInput(prev => prev + result.text);
+          } catch (err) {
+            console.error('Transcription failed:', err);
+          } finally {
+            setTranscribing(false);
+          }
+        };
+        mediaRecorderRef.current = mr;
+        mr.start();
+        // Auto-stop after 30s
+        setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 30000);
+      } catch (err) {
+        console.error('Mic access denied:', err);
+        setRecording(false);
+      }
+    }
+  }, [recording, hasSpeechAPI, stopRecording]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -162,6 +242,12 @@ export default function ChatWidget() {
 
           {/* Input */}
           <form onSubmit={handleSubmit} className="p-3 border-t border-border bg-[#0f1015]">
+            {recording && (
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-red-400 text-xs font-medium">Listening...</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => fileRef.current?.click()} className="text-text-dim hover:text-accent p-2 transition-colors">
                 <ImagePlus size={20} />
@@ -174,6 +260,21 @@ export default function ChatWidget() {
                 className="flex-1 bg-[#1a1b23] text-white text-sm rounded-xl px-4 py-2.5 border border-border focus:border-accent focus:outline-none placeholder:text-text-dim/50"
                 disabled={loading}
               />
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={loading || transcribing}
+                className={`p-2.5 rounded-xl transition-all ${
+                  recording
+                    ? 'bg-red-500 text-white animate-pulse'
+                    : transcribing
+                      ? 'bg-[#1a1b23] text-accent'
+                      : 'bg-[#1a1b23] text-text-dim hover:text-accent'
+                } disabled:opacity-30`}
+                title={recording ? 'Stop recording' : 'Voice input'}
+              >
+                {transcribing ? <Loader2 size={16} className="animate-spin" /> : <Mic size={16} />}
+              </button>
               <button type="submit" disabled={loading || !input.trim()} className="bg-accent hover:bg-accent/80 disabled:opacity-30 text-white p-2.5 rounded-xl transition-colors">
                 <Send size={16} />
               </button>

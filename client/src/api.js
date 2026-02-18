@@ -36,6 +36,16 @@ export const api = {
   chat: (d) => request('/chat', { method: 'POST', body: JSON.stringify(d) }),
   chatHistory: (convId) => request(`/chat/${convId}`),
   chatConversations: () => request('/chat/conversations'),
+  transcribe: (audioBlob) => {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.webm');
+    const token = localStorage.getItem('qc_token');
+    return fetch(`${API}/chat/transcribe`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    }).then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); return d; });
+  },
 
   // CRM - Clients
   listClients: (search, tag) => request(`/clients${search || tag ? `?${new URLSearchParams({ ...(search && { search }), ...(tag && { tag }) })}` : ''}`),

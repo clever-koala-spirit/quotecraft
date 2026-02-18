@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import OpenAI from 'openai';
+import multer from 'multer';
 import db from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authenticateToken);
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -58,6 +61,22 @@ function getCrmContext(userId) {
   if (unansweredQuotes.length) ctx += `⚠️ Unanswered quotes (sent >3 days ago): ${unansweredQuotes.map(q => `${q.client_name} $${q.total} sent ${q.sent_at}`).join('; ')}\n`;
   return ctx;
 }
+
+// POST /api/chat/transcribe (Whisper fallback)
+router.post('/transcribe', upload.single('audio'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No audio file' });
+    const file = new File([req.file.buffer], req.file.originalname || 'audio.webm', { type: req.file.mimetype });
+    const transcription = await openai.audio.transcriptions.create({
+      model: 'whisper-1',
+      file,
+    });
+    res.json({ text: transcription.text });
+  } catch (err) {
+    console.error('Transcribe error:', err);
+    res.status(500).json({ error: 'Transcription failed' });
+  }
+});
 
 // POST /api/chat
 router.post('/', async (req, res) => {
