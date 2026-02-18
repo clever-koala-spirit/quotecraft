@@ -138,7 +138,7 @@ export default function Landing() {
               Stop Losing Jobs to <span className="text-[var(--color-accent)]">Bad Quotes</span>
             </h1>
             <p className="text-lg sm:text-xl text-[var(--color-text-dim)] mb-8 max-w-lg mx-auto md:mx-0">
-              Upload photos. Describe the job. Get a professional quote in 60 seconds — powered by AI.
+              Snap a photo, describe the job, and fire off a professional quote before you're back in the ute. No worries, AI handles the hard bit.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
               <Link to="/signup" className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-semibold text-lg px-8 py-4 rounded-xl transition-all hover:scale-[1.02] shadow-lg shadow-orange-500/20 text-center">
@@ -158,6 +158,25 @@ export default function Landing() {
         </div>
       </Section>
 
+      {/* ── Stats Bar ── */}
+      <Section className="py-10 px-4 border-y border-[var(--color-border)] bg-[#0e0f14]">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          {[
+            [2400, '+', 'Quotes Generated'],
+            [850, '+', 'Happy Tradies'],
+            [4.2, 'M+', 'Dollars Quoted'],
+            [60, 's', 'Avg Quote Time'],
+          ].map(([n, s, label], i) => (
+            <div key={i}>
+              <div className="text-3xl md:text-4xl font-bold text-[var(--color-accent)]">
+                {i === 2 ? '$' : ''}<CountUp end={n} suffix={s} />
+              </div>
+              <div className="text-sm text-[var(--color-text-dim)] mt-1">{label}</div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
       {/* ── 2. Problem Section ── */}
       <Section id="problem" className="py-20 md:py-28 px-4 bg-[#141519]">
         <div className="max-w-5xl mx-auto">
@@ -165,9 +184,9 @@ export default function Landing() {
           <p className="text-center text-[var(--color-text-dim)] mb-12 max-w-2xl mx-auto">Every tradie knows these pain points. It's time to fix them.</p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
-              ['😤', 'Spending your Sunday night writing quotes instead of watching the footy'],
+              ['😤', 'Spending your Sunday arvo writing quotes instead of watching the footy'],
               ['📱', 'Sending quotes from your Notes app and wondering why clients ghost you'],
-              ['💸', 'Losing jobs because your quote looked unprofessional next to the competition'],
+              ['💸', 'Losing jobs because your quote looked dodgy next to the competition'],
               ['⏰', 'Spending 30 minutes per quote when you could be on the tools'],
               ['📧', 'No idea if the client even opened your quote'],
               ['🤯', 'Paying $35+/mo for bloated software you barely use'],
@@ -212,7 +231,7 @@ export default function Landing() {
       <Section id="features" className="py-20 md:py-28 px-4 bg-[#141519]">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl sm:text-4xl font-semibold text-center mb-4">Everything You Need, Nothing You Don't</h2>
-          <p className="text-center text-[var(--color-text-dim)] mb-14 max-w-2xl mx-auto">Built for tradies, not accountants. Every feature earns its place.</p>
+          <p className="text-center text-[var(--color-text-dim)] mb-14 max-w-2xl mx-auto">Built for tradies on the tools, not desk jockeys. Every feature earns its place.</p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {[
               ['🤖', 'AI Quote Builder', 'Upload photos, describe the job, done'],
@@ -234,6 +253,65 @@ export default function Landing() {
                 <p className="text-sm text-[var(--color-text-dim)]">{desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </Section>
+
+      {/* ── Trade Icons ── */}
+      <Section className="py-14 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-[var(--color-text-dim)] mb-6 text-sm uppercase tracking-widest">Built for every trade</p>
+          <div className="flex flex-wrap justify-center gap-6 md:gap-10">
+            {[['⚡','Electrician'],['🔧','Plumber'],['🏗️','Builder'],['🎨','Painter'],['🌿','Landscaper'],['🔨','Carpenter']].map(([icon,label]) => (
+              <div key={label} className="flex flex-col items-center gap-1 group">
+                <span className="text-3xl md:text-4xl group-hover:scale-110 transition-transform">{icon}</span>
+                <span className="text-xs text-[var(--color-text-dim)]">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      {/* ── Before / After ── */}
+      <Section className="py-16 px-4 bg-[#141519]">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl font-semibold text-center mb-4">From Dodgy to Professional</h2>
+          <p className="text-center text-[var(--color-text-dim)] mb-10">See the difference a proper quote makes, mate.</p>
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Before */}
+            <div className="relative bg-[#1a1b20] border border-red-500/20 rounded-2xl p-6 overflow-hidden">
+              <div className="absolute top-3 right-3 bg-red-500/20 text-red-400 text-xs font-bold px-3 py-1 rounded-full">BEFORE</div>
+              <div className="font-mono text-sm text-gray-500 space-y-2 mt-4">
+                <p>hey mate heres the quote</p>
+                <p>12 downlights - $540</p>
+                <p>labour - dunno maybe $400?</p>
+                <p>plus gst i think</p>
+                <p>total around $1000 ish</p>
+                <p className="mt-4 text-gray-600">sent from my iphone</p>
+              </div>
+            </div>
+            {/* After */}
+            <div className="relative bg-[#0f1015] border border-[var(--color-accent)]/30 rounded-2xl p-6 overflow-hidden shadow-lg shadow-orange-500/5">
+              <div className="absolute top-3 right-3 bg-[var(--color-accent)]/20 text-[var(--color-accent)] text-xs font-bold px-3 py-1 rounded-full">AFTER</div>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-[var(--color-accent)]/20 flex items-center justify-center text-sm">⚡</div>
+                  <div><div className="font-bold text-sm">Spark Electric</div><div className="text-xs text-[var(--color-text-dim)]">ABN 12 345 678 901</div></div>
+                </div>
+                <div className="text-xs text-[var(--color-text-dim)] uppercase tracking-wider mb-2">Quote #QC-0042</div>
+                <div className="space-y-1.5 text-sm">
+                  {[['LED Downlights (12x Clipsal)', '$540.00'],['Installation Labour (4hrs)', '$380.00'],['Testing & Certification', '$150.00']].map(([item,price]) => (
+                    <div key={item} className="flex justify-between"><span className="text-[var(--color-text-dim)]">{item}</span><span>{price}</span></div>
+                  ))}
+                </div>
+                <div className="border-t border-[var(--color-border)] pt-2 mt-3 space-y-1 text-sm">
+                  <div className="flex justify-between text-[var(--color-text-dim)]"><span>Subtotal</span><span>$1,070.00</span></div>
+                  <div className="flex justify-between text-[var(--color-text-dim)]"><span>GST (10%)</span><span>$107.00</span></div>
+                  <div className="flex justify-between font-bold text-[var(--color-accent)]"><span>Total</span><span>$1,177.00</span></div>
+                </div>
+                <div className="mt-3 bg-green-500/10 text-green-400 text-xs font-medium px-3 py-2 rounded-lg text-center">✅ Accept Quote</div>
+              </div>
+            </div>
           </div>
         </div>
       </Section>
@@ -392,6 +470,21 @@ export default function Landing() {
         </div>
       </Section>
 
+      {/* ── Trust Bar ── */}
+      <Section className="py-12 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-[var(--color-text-dim)] text-sm mb-6">🏗️ Trusted by tradies across Australia</p>
+          <div className="flex flex-wrap justify-center gap-6 md:gap-10">
+            {['Melbourne', 'Sydney', 'Brisbane', 'Perth', 'Adelaide'].map(city => (
+              <div key={city} className="flex items-center gap-2 text-[var(--color-text-dim)]/60">
+                <svg className="w-4 h-4 text-[var(--color-accent)]/50" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
+                <span className="text-sm">{city}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Section>
+
       {/* ── 9. Final CTA ── */}
       <Section className="py-20 md:py-28 px-4">
         <div className="max-w-3xl mx-auto text-center">
@@ -399,7 +492,7 @@ export default function Landing() {
             Your Next Quote Takes <span className="text-[var(--color-accent)]">60 Seconds</span>
           </h2>
           <p className="text-lg text-[var(--color-text-dim)] mb-10 max-w-xl mx-auto">
-            Join tradies across Australia who are winning more jobs with professional AI-powered quotes.
+            Join tradies across Australia who are winning more jobs and knocking off earlier with AI-powered quotes.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/signup" className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-semibold text-lg px-8 py-4 rounded-xl transition-all hover:scale-[1.02] shadow-lg shadow-orange-500/20">
@@ -441,7 +534,7 @@ export default function Landing() {
             </div>
           </div>
           <div className="border-t border-[var(--color-border)] pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-[var(--color-text-dim)]">
-            <span>Made with 🔨 in Australia</span>
+            <span>🪖 Made with 🔨 in Australia</span>
             <span>ABN: XX XXX XXX XXX</span>
             <span>© {new Date().getFullYear()} QuoteCraft. All rights reserved.</span>
           </div>
