@@ -167,8 +167,112 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_followups_due ON followups(due_date);
 `);
 
+// Invoicing system
+db.exec(`
+  CREATE TABLE IF NOT EXISTS invoices (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    quote_id TEXT REFERENCES quotes(id),
+    client_name TEXT,
+    client_email TEXT,
+    client_phone TEXT,
+    client_address TEXT,
+    invoice_number TEXT NOT NULL,
+    job_description TEXT,
+    status TEXT DEFAULT 'draft',
+    subtotal REAL DEFAULT 0,
+    gst REAL DEFAULT 0,
+    total REAL DEFAULT 0,
+    due_date TEXT,
+    notes TEXT,
+    business_snapshot TEXT,
+    sent_at TEXT,
+    viewed_at TEXT,
+    paid_at TEXT,
+    payment_amount REAL DEFAULT 0,
+    payment_method TEXT,
+    payment_reference TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS invoice_items (
+    id TEXT PRIMARY KEY,
+    invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    description TEXT,
+    quantity REAL DEFAULT 1,
+    unit TEXT DEFAULT 'each',
+    unit_price REAL DEFAULT 0,
+    total REAL DEFAULT 0,
+    category TEXT DEFAULT 'labour',
+    sort_order INTEGER DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS invoice_events (
+    id TEXT PRIMARY KEY,
+    invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    metadata TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_invoices_user ON invoices(user_id);
+  CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+  CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date);
+`);
+
+// Job scheduling enhancements
+db.exec(`
+  CREATE TABLE IF NOT EXISTS job_schedule (
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    start_datetime TEXT NOT NULL,
+    end_datetime TEXT,
+    all_day INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'scheduled',
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_schedule_user_date ON job_schedule(user_id, start_datetime);
+`);
+
+// Timesheets system
+db.exec(`
+  CREATE TABLE IF NOT EXISTS timesheets (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    job_id TEXT REFERENCES jobs(id),
+    client_id TEXT REFERENCES clients(id),
+    start_time TEXT NOT NULL,
+    end_time TEXT,
+    total_hours REAL DEFAULT 0,
+    hourly_rate REAL DEFAULT 0,
+    total_amount REAL DEFAULT 0,
+    description TEXT,
+    status TEXT DEFAULT 'active',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_timesheets_user ON timesheets(user_id);
+  CREATE INDEX IF NOT EXISTS idx_timesheets_job ON timesheets(job_id);
+`);
+
+// Settings enhancements
+try {
+  db.exec(`ALTER TABLE business_profiles ADD COLUMN invoice_terms TEXT`);
+  db.exec(`ALTER TABLE business_profiles ADD COLUMN quote_numbering_format TEXT DEFAULT 'QC-{number}'`);
+  db.exec(`ALTER TABLE business_profiles ADD COLUMN invoice_numbering_format TEXT DEFAULT 'INV-{number}'`);
+  db.exec(`ALTER TABLE business_profiles ADD COLUMN next_quote_number INTEGER DEFAULT 1`);
+  db.exec(`ALTER TABLE business_profiles ADD COLUMN next_invoice_number INTEGER DEFAULT 1`);
+  db.exec(`ALTER TABLE business_profiles ADD COLUMN gst_rate REAL DEFAULT 0.10`);
+  db.exec(`ALTER TABLE business_profiles ADD COLUMN default_payment_terms TEXT DEFAULT '30 days'`);
+} catch(e) { /* columns may exist */ }
+
 // Migrations for existing databases
 try { db.exec(`ALTER TABLE quotes ADD COLUMN template TEXT DEFAULT 'clean-modern'`); } catch(e) { /* column exists */ }
+try { db.exec(`ALTER TABLE quotes ADD COLUMN quote_number TEXT`); } catch(e) { /* column exists */ }
 try { db.exec(`CREATE TABLE IF NOT EXISTS quote_attachments (id TEXT PRIMARY KEY, quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE, filename TEXT NOT NULL, original_name TEXT, mime_type TEXT, size INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))`); } catch(e) { /* exists */ }
 
 export default db;

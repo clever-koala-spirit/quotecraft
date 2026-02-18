@@ -7,6 +7,9 @@ import { readFileSync } from 'fs';
 import authRoutes from './routes/auth.js';
 import profileRoutes from './routes/profile.js';
 import quoteRoutes from './routes/quotes.js';
+import invoiceRoutes from './routes/invoices.js';
+import timesheetRoutes from './routes/timesheets.js';
+import reportRoutes from './routes/reports.js';
 import chatRoutes from './routes/chat.js';
 import clientRoutes from './routes/clients.js';
 import jobRoutes from './routes/jobs.js';
@@ -23,6 +26,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/quotes', quoteRoutes);
+app.use('/api/invoices', invoiceRoutes);
+app.use('/api/timesheets', timesheetRoutes);
+app.use('/api/reports', reportRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/jobs', jobRoutes);
@@ -40,4 +46,4 @@ app.use((req, res, next) => {
   res.type('html').send(indexHtml);
 });
 
-app.listen(PORT, () => console.log(`🔨 QuoteCraft server running on port ${PORT}`));
+app.listen(PORT, '127.0.0.1', () => console.log(`🔨 QuoteCraft server running on port ${PORT}`));

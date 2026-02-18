@@ -136,6 +136,21 @@ All prices in AUD ex-GST. Use realistic Australian trade pricing. Be specific wi
   }
 });
 
+// Get next quote number
+function getNextQuoteNumber(userId) {
+  const profile = db.prepare('SELECT next_quote_number, quote_numbering_format FROM business_profiles WHERE user_id = ?').get(userId);
+  if (!profile) return 'QC-0001';
+  
+  const number = profile.next_quote_number || 1;
+  const format = profile.quote_numbering_format || 'QC-{number}';
+  const paddedNumber = String(number).padStart(4, '0');
+  
+  // Update next number
+  db.prepare('UPDATE business_profiles SET next_quote_number = ? WHERE user_id = ?').run(number + 1, userId);
+  
+  return format.replace('{number}', paddedNumber);
+}
+
 // Create quote
 router.post('/', authenticateToken, (req, res) => {
   const id = uuid();
@@ -143,13 +158,15 @@ router.post('/', authenticateToken, (req, res) => {
 
   const profile = db.prepare('SELECT * FROM business_profiles WHERE user_id = ?').get(req.user.id);
   const subtotal = (items || []).reduce((s, i) => s + (i.total || i.quantity * i.unitPrice), 0);
-  const gst = Math.round(subtotal * 0.1 * 100) / 100;
+  const gstRate = profile?.gst_rate || 0.10;
+  const gst = Math.round(subtotal * gstRate * 100) / 100;
   const total = Math.round((subtotal + gst) * 100) / 100;
+  const quoteNumber = getNextQuoteNumber(req.user.id);
 
-  db.prepare(`INSERT INTO quotes (id, user_id, client_name, client_email, client_phone, client_address, trade_type, job_description, subtotal, gst, total, notes, validity_days, business_snapshot, template, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')`).run(
+  db.prepare(`INSERT INTO quotes (id, user_id, client_name, client_email, client_phone, client_address, trade_type, job_description, subtotal, gst, total, notes, validity_days, business_snapshot, template, status, quote_number)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)`).run(
     id, req.user.id, client_name, client_email, client_phone, client_address, trade_type, job_description,
-    Math.round(subtotal * 100) / 100, gst, total, notes, validity_days || 30, JSON.stringify(profile), template || 'clean-modern'
+    Math.round(subtotal * 100) / 100, gst, total, notes, validity_days || 30, JSON.stringify(profile), template || 'clean-modern', quoteNumber
   );
 
   if (items?.length) {
@@ -239,43 +256,87 @@ router.delete('/:id', authenticateToken, (req, res) => {
   res.json({ success: true });
 });
 
-// Send quote — auto-create client + timeline
-router.post('/:id/send', authenticateToken, (req, res) => {
-  const quote = db.prepare('SELECT * FROM quotes WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
-  if (!quote) return res.status(404).json({ error: 'Not found' });
+// Send quote — auto-create client + timeline + email
+router.post('/:id/send', authenticateToken, async (req, res) => {
+  try {
+    const quote = db.prepare('SELECT * FROM quotes WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    if (!quote) return res.status(404).json({ error: 'Not found' });
 
-  db.prepare("UPDATE quotes SET status = 'sent', sent_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(quote.id);
-  addEvent(quote.id, 'sent', { to: quote.client_email });
+    const profile = db.prepare('SELECT * FROM business_profiles WHERE user_id = ?').get(req.user.id);
 
-  // Auto-create client if not exists
-  let client = null;
-  if (quote.client_email) {
-    client = db.prepare('SELECT * FROM clients WHERE email = ? AND user_id = ?').get(quote.client_email, req.user.id);
-  }
-  if (!client && quote.client_name) {
-    // Try match by name if no email
-    if (!quote.client_email) {
-      client = db.prepare('SELECT * FROM clients WHERE name = ? AND user_id = ?').get(quote.client_name, req.user.id);
+    db.prepare("UPDATE quotes SET status = 'sent', sent_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(quote.id);
+    addEvent(quote.id, 'sent', { to: quote.client_email });
+
+    // Auto-create client if not exists
+    let client = null;
+    if (quote.client_email) {
+      client = db.prepare('SELECT * FROM clients WHERE email = ? AND user_id = ?').get(quote.client_email, req.user.id);
     }
-    if (!client) {
-      const clientId = uuid();
-      db.prepare(`INSERT INTO clients (id, user_id, name, email, phone, address, tags) VALUES (?, ?, ?, ?, ?, ?, '[]')`).run(
-        clientId, req.user.id, quote.client_name, quote.client_email || null, quote.client_phone || null, quote.client_address || null
+    if (!client && quote.client_name) {
+      if (!quote.client_email) {
+        client = db.prepare('SELECT * FROM clients WHERE name = ? AND user_id = ?').get(quote.client_name, req.user.id);
+      }
+      if (!client) {
+        const clientId = uuid();
+        db.prepare(`INSERT INTO clients (id, user_id, name, email, phone, address, tags) VALUES (?, ?, ?, ?, ?, ?, '[]')`).run(
+          clientId, req.user.id, quote.client_name, quote.client_email || null, quote.client_phone || null, quote.client_address || null
+        );
+        client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId);
+      }
+    }
+
+    // Log to client timeline
+    if (client) {
+      const tlId = uuid();
+      db.prepare('INSERT INTO client_timeline (id, client_id, user_id, type, content, metadata) VALUES (?, ?, ?, ?, ?, ?)').run(
+        tlId, client.id, req.user.id, 'quote_sent', `Quote sent: $${quote.total}`, JSON.stringify({ quote_id: quote.id, total: quote.total })
       );
-      client = db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId);
     }
-  }
 
-  // Log to client timeline
-  if (client) {
-    const tlId = uuid();
-    db.prepare('INSERT INTO client_timeline (id, client_id, user_id, type, content, metadata) VALUES (?, ?, ?, ?, ?, ?)').run(
-      tlId, client.id, req.user.id, 'quote_sent', `Quote sent: $${quote.total}`, JSON.stringify({ quote_id: quote.id, total: quote.total })
-    );
-  }
+    // Send email if client has email and SMTP is configured
+    const publicUrl = `https://api.slayseason.com/quotecraft/q/${quote.id}`;
+    if (quote.client_email && process.env.SMTP_HOST) {
+      try {
+        const nodemailer = await import('nodemailer');
+        const transporter = nodemailer.default.createTransport({
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: process.env.SMTP_SECURE === 'true',
+          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+        });
+        const businessName = profile?.business_name || 'QuoteCraft';
+        const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER;
+        await transporter.sendMail({
+          from: `"${businessName}" <${fromEmail}>`,
+          to: quote.client_email,
+          subject: `Quote #${quote.quote_number} from ${businessName}`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #1a1a1a;">You've received a quote</h2>
+              <p>Hi ${quote.client_name || 'there'},</p>
+              <p><strong>${businessName}</strong> has sent you a quote for your review.</p>
+              <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <p style="margin: 0;"><strong>Quote #${quote.quote_number}</strong></p>
+                <p style="margin: 5px 0; color: #666;">${quote.job_description || ''}</p>
+                <p style="margin: 10px 0; font-size: 24px; color: #1a1a1a;"><strong>$${Number(quote.total).toFixed(2)}</strong> <span style="font-size: 14px; color: #666;">inc GST</span></p>
+              </div>
+              <a href="${publicUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">View & Accept Quote</a>
+              <p style="margin-top: 20px; color: #666; font-size: 14px;">This quote is valid for ${quote.validity_days || 30} days.</p>
+            </div>
+          `
+        });
+        console.log(`📧 Email sent to ${quote.client_email}`);
+      } catch (emailErr) {
+        console.log(`⚠️ Email failed (quote still marked sent): ${emailErr.message}`);
+      }
+    }
 
-  console.log(`📧 Quote ${quote.id} sent to ${quote.client_email}`);
-  res.json({ success: true, publicUrl: `/q/${quote.id}` });
+    console.log(`📧 Quote ${quote.id} sent to ${quote.client_email || 'no email'}`);
+    res.json({ success: true, publicUrl });
+  } catch (err) {
+    console.error('Send quote error:', err);
+    res.status(500).json({ error: 'Failed to send quote' });
+  }
 });
 
 // Public view
